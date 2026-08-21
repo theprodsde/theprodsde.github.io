@@ -1,0 +1,7 @@
+{
+  "idea": "Personal brand site aggregating writing, projects, and papers under one roof.",
+  "why": "I wanted a single place that wasn't a typical portfolio — no resume, no skill bars. Just the work: what I write, what I build, what I research. Built as a static site so it costs nothing to run and I own the content fully.",
+  "tags": ["next.js", "typescript", "tailwind"],
+  "featured": true,
+  "hideFromSite": false
+}

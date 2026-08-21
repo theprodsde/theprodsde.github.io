@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-syne: "Syne", sans-serif;
+  --font-inter: "Inter", sans-serif;
+  --font-jetbrains: "JetBrains Mono", monospace;
+}
+
+@layer base {
+  html {
+    background-color: #08090D;
+    color: #F0F2F7;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    background-color: #08090D;
+  }
+
+  ::selection {
+    background-color: #C8F04B;
+    color: #08090D;
+  }
+
+  :focus-visible {
+    outline: 2px solid #C8F04B;
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  /* ── Layout container ─────────────────────────────────────── */
+  /* Single source of truth for page width + horizontal padding  */
+  .container-page {
+    @apply max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Reading-width container for prose/detail pages */
+  .container-prose {
+    @apply max-w-3xl mx-auto w-full px-4 sm:px-6;
+  }
+
+  /* Responsive section vertical rhythm */
+  .section-gap {
+    @apply py-10 sm:py-12 lg:py-16;
+  }
+
+  /* ── Background ───────────────────────────────────────────── */
+  .bg-dot-grid {
+    background-image: radial-gradient(circle, #1E2130 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* ── Cards ────────────────────────────────────────────────── */
+  .card {
+    @apply bg-surface border border-border rounded-xl p-5 sm:p-6 transition-all duration-200;
+  }
+
+  .card:hover {
+    @apply border-lime/40;
+    box-shadow: 0 0 24px rgba(200, 240, 75, 0.08);
+  }
+
+  /* ── Card grids ───────────────────────────────────────────── */
+  /* mobile: 1 col → tablet: 2 col → desktop: 3 col */
+  .card-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
+
+  /* Two-column max (detail + wide listings) */
+  .card-grid-2 {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+  }
+
+  /* ── Atoms ────────────────────────────────────────────────── */
+  .tag {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-mono
+           border border-border text-text-muted;
+  }
+
+  .btn-lime {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg
+           bg-lime text-ink font-semibold text-sm
+           hover:bg-lime-hover transition-colors duration-150;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg
+           border border-border text-text-primary text-sm
+           hover:border-lime/50 hover:text-lime transition-colors duration-150;
+  }
+
+  /* ── Source badges ────────────────────────────────────────── */
+  .source-badge-medium {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+           bg-[#1a1a1a] border border-[#333] text-[#aaa] whitespace-nowrap;
+  }
+
+  .source-badge-devto {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+           bg-[#0c1445] border border-[#1a2a7a] text-[#8899dd] whitespace-nowrap;
+  }
+
+  .source-badge-direct {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+           bg-[#0d1a05] border border-lime/20 text-lime whitespace-nowrap;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #08090D;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E2130;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C8F04B33;
+}
