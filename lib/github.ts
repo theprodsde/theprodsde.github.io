@@ -13,6 +13,7 @@ interface GithubRepo {
   language: string | null;
   updated_at: string;
   fork: boolean;
+  topics: string[];
 }
 
 function loadMeta(repoName: string): ProjectMeta | null {
@@ -28,6 +29,7 @@ function loadMeta(repoName: string): ProjectMeta | null {
 export async function getProjects(): Promise<Project[]> {
   try {
     const headers: Record<string, string> = {
+      // topics are included in the default response since API v3
       Accept: "application/vnd.github+json",
     };
     const token = process.env.GH_PAT;
@@ -43,17 +45,24 @@ export async function getProjects(): Promise<Project[]> {
 
     const projects: Project[] = [];
     for (const repo of repos) {
-      const meta = loadMeta(repo.name);
-      if (!meta || meta.hideFromSite) continue;
+      // Skip forks unless explicitly opted in via JSON
+      if (repo.fork) continue;
 
+      const meta = loadMeta(repo.name);
+
+      // Explicit opt-out
+      if (meta?.hideFromSite) continue;
+
+      // Fall back to GitHub data when no JSON exists
+      const description = repo.description ?? "";
       projects.push({
         name: repo.name,
         slug: repo.name.toLowerCase(),
-        description: repo.description ?? "",
-        idea: meta.idea,
-        why: meta.why,
-        tags: meta.tags,
-        featured: meta.featured,
+        description,
+        idea: meta?.idea ?? description,
+        why: meta?.why ?? "",
+        tags: meta?.tags ?? repo.topics ?? [],
+        featured: meta?.featured ?? false,
         githubUrl: repo.html_url,
         stars: repo.stargazers_count,
         language: repo.language ?? undefined,

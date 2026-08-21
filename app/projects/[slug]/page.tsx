@@ -85,13 +85,15 @@ export default async function ProjectDetailPage({ params }: Props) {
         <p className="text-text-primary text-lg leading-relaxed">{project.idea}</p>
       </section>
 
-      {/* Why */}
-      <section className="mb-10 p-6 bg-surface border border-border rounded-xl">
-        <h2 className="font-display font-bold text-sm text-lime uppercase tracking-widest mb-3">
-          Why It Was Built
-        </h2>
-        <p className="text-text-muted leading-relaxed whitespace-pre-wrap">{project.why}</p>
-      </section>
+      {/* Why — only render if there's content */}
+      {project.why && (
+        <section className="mb-10 p-6 bg-surface border border-border rounded-xl">
+          <h2 className="font-display font-bold text-sm text-lime uppercase tracking-widest mb-3">
+            Why It Was Built
+          </h2>
+          <p className="text-text-muted leading-relaxed whitespace-pre-wrap">{project.why}</p>
+        </section>
+      )}
 
       {/* Description if exists */}
       {project.description && (
