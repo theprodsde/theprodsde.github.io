@@ -119,11 +119,10 @@ export default async function Home() {
 
       {/* Quick nav */}
       <section className="container-page section-gap border-t border-border">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             { href: "/blog", title: "Writing", desc: "Production engineering: trade-offs, standards, decisions, and the reasoning behind real engineering work." },
             { href: "/projects", title: "Projects", desc: "Open-source tools and experiments built to solve real problems." },
-            { href: "/papers", title: "Papers", desc: "Research, publications, and long-form technical writing." },
           ].map(({ href, title, desc }) => (
             <Link key={href} href={href} className="card group">
               <div className="flex items-center justify-between mb-2">

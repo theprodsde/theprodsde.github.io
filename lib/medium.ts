@@ -1,16 +1,8 @@
 import Parser from "rss-parser";
 import type { BlogPost } from "@/types";
+import { estimateReadingTime, stripHtml, truncate } from "./text";
 
 const FEED_URL = "https://medium.com/feed/@theprodsde";
-
-function estimateReadingTime(text: string): number {
-  const words = text.split(/\s+/).length;
-  return Math.max(1, Math.round(words / 200));
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-}
 
 function extractThumbnail(content: string): string | undefined {
   const match = content.match(/<img[^>]+src="([^"]+)"/);
@@ -28,7 +20,7 @@ export async function getMediumPosts(): Promise<BlogPost[]> {
       return {
         slug: `medium-${encodeURIComponent(item.link ?? item.title ?? "")}`,
         title: item.title ?? "Untitled",
-        excerpt: text.slice(0, 200) + (text.length > 200 ? "…" : ""),
+        excerpt: truncate(text, 200),
         date: item.isoDate ?? item.pubDate ?? new Date().toISOString(),
         tags: item.categories ?? [],
         source: "medium" as const,

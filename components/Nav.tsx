@@ -8,7 +8,6 @@ import { useState } from "react";
 const links = [
   { href: "/blog", label: "Writing" },
   { href: "/projects", label: "Projects" },
-  { href: "/papers", label: "Papers" },
 ];
 
 export default function Nav() {

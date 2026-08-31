@@ -6,6 +6,7 @@ const socials = [
   { label: "Dev.to", href: "https://dev.to/theprodsde", handle: "theprodsde" },
   { label: "Reddit", href: "https://reddit.com/u/theprodsde", handle: "u/theprodsde" },
   { label: "Instagram", href: "https://instagram.com/theprodsde", handle: "@theprodsde" },
+  { label: "YouTube", href: "https://youtube.com/@theprodsde", handle: "@theprodsde" },
   { label: "Email", href: "mailto:theprodsde@gmail.com", handle: "theprodsde@gmail.com" },
 ];
 

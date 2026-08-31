@@ -4,12 +4,9 @@ import matter from "gray-matter";
 import type { BlogPost } from "@/types";
 import { getMediumPosts } from "./medium";
 import { getDevtoPosts } from "./devto";
+import { estimateReadingTime, truncate } from "./text";
 
 const BLOG_DIR = path.join(process.cwd(), "content", "blog");
-
-function estimateReadingTime(content: string): number {
-  return Math.max(1, Math.round(content.split(/\s+/).length / 200));
-}
 
 export function getDirectPosts(): BlogPost[] {
   if (!fs.existsSync(BLOG_DIR)) return [];
@@ -24,7 +21,7 @@ export function getDirectPosts(): BlogPost[] {
       return {
         slug,
         title: data.title ?? slug,
-        excerpt: data.excerpt ?? content.slice(0, 200) + "…",
+        excerpt: data.excerpt ?? truncate(content, 200),
         date: data.date ?? new Date().toISOString(),
         tags: data.tags ?? [],
         source: "direct" as const,
@@ -37,14 +34,18 @@ export function getDirectPosts(): BlogPost[] {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-export async function getAllPosts(): Promise<BlogPost[]> {
-  const [medium, devto, direct] = await Promise.all([
-    getMediumPosts(),
-    getDevtoPosts(),
-    Promise.resolve(getDirectPosts()),
-  ]);
+// Registry of post sources — add a new source here without touching the
+// aggregation logic below (open/closed principle).
+const sources: Array<() => Promise<BlogPost[]>> = [
+  getMediumPosts,
+  getDevtoPosts,
+  async () => getDirectPosts(),
+];
 
-  return [...medium, ...devto, ...direct].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+export async function getAllPosts(): Promise<BlogPost[]> {
+  const results = await Promise.all(sources.map((fetchSource) => fetchSource()));
+
+  return results
+    .flat()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
