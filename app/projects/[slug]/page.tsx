@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getProjects } from "@/lib/github";
+import { getProjects, getRepoReadme } from "@/lib/github";
+import { mdToHtml } from "@/lib/text";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -35,18 +36,22 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   if (!project) notFound();
 
+  const readme = await getRepoReadme(project.name);
+
   return (
     <div className="container-prose py-12 sm:py-16">
-      {/* Back */}
-      <Link
-        href="/projects"
-        className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-lime transition-colors mb-10"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="m15 18-6-6 6-6" />
-        </svg>
-        All projects
-      </Link>
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-sm text-text-muted mb-10">
+        <Link href="/" className="hover:text-lime transition-colors">
+          Home
+        </Link>
+        <span>/</span>
+        <Link href="/projects" className="hover:text-lime transition-colors">
+          Projects
+        </Link>
+        <span>/</span>
+        <span className="text-text-primary">{project.name}</span>
+      </nav>
 
       {/* Header */}
       <div className="mb-10">
@@ -95,8 +100,8 @@ export default async function ProjectDetailPage({ params }: Props) {
         </section>
       )}
 
-      {/* Description if exists */}
-      {project.description && (
+      {/* Description if different from idea */}
+      {project.description && project.description !== project.idea && (
         <section className="mb-10">
           <h2 className="font-display font-bold text-sm text-text-muted uppercase tracking-widest mb-3">
             Overview
@@ -105,8 +110,25 @@ export default async function ProjectDetailPage({ params }: Props) {
         </section>
       )}
 
+      {/* README */}
+      {readme && (
+        <section className="mb-10">
+          <h2 className="font-display font-bold text-sm text-lime uppercase tracking-widest mb-5">
+            README
+          </h2>
+          <article
+            className="prose prose-invert prose-base max-w-none
+              prose-headings:font-display prose-headings:font-bold
+              prose-a:text-lime prose-a:no-underline hover:prose-a:underline
+              prose-code:font-mono prose-pre:bg-surface prose-pre:border prose-pre:border-border
+              border border-border rounded-xl p-6 sm:p-8"
+            dangerouslySetInnerHTML={{ __html: mdToHtml(readme) }}
+          />
+        </section>
+      )}
+
       {/* CTA */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Link
           href={project.githubUrl}
           target="_blank"
@@ -118,8 +140,31 @@ export default async function ProjectDetailPage({ params }: Props) {
           </svg>
           View on GitHub
         </Link>
+
+        {project.docsUrl && (
+          <Link
+            href={project.docsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-ghost"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            View Docs
+          </Link>
+        )}
+
         <Link href="/projects" className="btn-ghost">
-          ← Back to projects
+          ← All Projects
+        </Link>
+
+        <Link href="/" className="btn-ghost">
+          ↩ Home
         </Link>
       </div>
     </div>

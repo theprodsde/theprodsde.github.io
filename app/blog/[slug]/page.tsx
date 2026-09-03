@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getDirectPosts, getAllPosts } from "@/lib/posts";
+import { mdToHtml } from "@/lib/text";
 import matter from "gray-matter";
 import fs from "fs";
 import path from "path";
@@ -107,24 +108,3 @@ export default async function BlogPostPage({ params }: Props) {
   );
 }
 
-// Minimal markdown-to-HTML for direct posts (headings, paragraphs, code, bold, italic, links)
-function mdToHtml(md: string): string {
-  return md
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    .replace(/```[\w]*\n([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    .replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>")
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>\n?)+/g, "<ul>$&</ul>")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/^(?!<[hup]|<pre|<block)(.+)$/gm, (line) =>
-      line.trim() ? line : ""
-    )
-    .replace(/^<\/p><p>$/, "")
-    .trim();
-}

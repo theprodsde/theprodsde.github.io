@@ -1,0 +1,7 @@
+{
+  "idea": "An open-source CLI that benchmarks AI agent frameworks — not models — against your real daily tasks, with human evaluation and per-category win rates.",
+  "why": "Every benchmark compares models. Nobody benchmarks the full agent stack: the system prompt, tool routing, memory architecture, and infrastructure. Two frameworks pointing at the same LLM produce wildly different results. AgentAssistBench runs your actual prompts through multiple OpenAI-compatible frameworks side by side, stores results in SQLite, and after 30 days tells you exactly which stack wins for each category of work you do.",
+  "tags": ["python", "cli", "benchmarking", "ai-agents", "sqlite", "telegram"],
+  "featured": true,
+  "hideFromSite": false
+}

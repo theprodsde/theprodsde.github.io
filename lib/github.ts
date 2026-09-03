@@ -5,6 +5,29 @@ import type { Project, ProjectMeta } from "@/types";
 const GITHUB_USER = "TheProdSDE";
 const CONTENT_DIR = path.join(process.cwd(), "content", "projects");
 
+export async function getRepoReadme(repoName: string): Promise<string | null> {
+  try {
+    const headers: Record<string, string> = {
+      Accept: "application/vnd.github+json",
+    };
+    const token = process.env.GH_PAT;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(
+      `https://api.github.com/repos/${GITHUB_USER}/${repoName}/readme`,
+      { headers, next: { revalidate: false } }
+    );
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (data.encoding !== "base64" || !data.content) return null;
+
+    return Buffer.from(data.content, "base64").toString("utf-8");
+  } catch {
+    return null;
+  }
+}
+
 interface GithubRepo {
   name: string;
   description: string | null;
@@ -29,19 +52,26 @@ function loadMeta(repoName: string): ProjectMeta | null {
 export async function getProjects(): Promise<Project[]> {
   try {
     const headers: Record<string, string> = {
-      // topics are included in the default response since API v3
       Accept: "application/vnd.github+json",
     };
     const token = process.env.GH_PAT;
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    const res = await fetch(
-      `https://api.github.com/users/${GITHUB_USER}/repos?type=public&sort=updated&per_page=100`,
-      { headers, next: { revalidate: false } }
-    );
-    if (!res.ok) return [];
+    const repos: GithubRepo[] = [];
+    let page = 1;
+    while (true) {
+      const res = await fetch(
+        `https://api.github.com/users/${GITHUB_USER}/repos?type=public&sort=updated&per_page=100&page=${page}`,
+        { headers, next: { revalidate: false } }
+      );
+      if (!res.ok) break;
+      const batch: GithubRepo[] = await res.json();
+      repos.push(...batch);
+      if (batch.length < 100) break;
+      page++;
+    }
 
-    const repos: GithubRepo[] = await res.json();
+    if (repos.length === 0) return [];
 
     const projects: Project[] = [];
     for (const repo of repos) {
@@ -67,6 +97,7 @@ export async function getProjects(): Promise<Project[]> {
         stars: repo.stargazers_count,
         language: repo.language ?? undefined,
         updatedAt: repo.updated_at,
+        docsUrl: meta?.docsUrl,
       });
     }
 

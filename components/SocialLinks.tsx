@@ -8,6 +8,8 @@ const socials = [
   { label: "Instagram", href: "https://instagram.com/theprodsde", handle: "@theprodsde" },
   { label: "YouTube", href: "https://youtube.com/@theprodsde", handle: "@theprodsde" },
   { label: "Email", href: "mailto:theprodsde@gmail.com", handle: "theprodsde@gmail.com" },
+  { label: "Buy Me a Coffee", href: "https://buymeacoffee.com/theprodsde", handle: "theprodsde" },
+  { label: "PayPal", href: "https://paypal.me/karangehlod", handle: "paypal.me/karangehlod" },
 ];
 
 export default function SocialLinks() {

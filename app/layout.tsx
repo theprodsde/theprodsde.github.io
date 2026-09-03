@@ -57,6 +57,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${inter.variable} ${syne.variable} ${jetbrains.variable}`}
     >
       <body className="bg-ink text-text-primary min-h-screen flex flex-col">

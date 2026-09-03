@@ -25,6 +25,7 @@ export interface Project {
   stars: number;
   language?: string;
   updatedAt: string;
+  docsUrl?: string;
 }
 
 export interface ProjectMeta {
@@ -33,6 +34,7 @@ export interface ProjectMeta {
   tags: string[];
   featured: boolean;
   hideFromSite: boolean;
+  docsUrl?: string;
 }
 
 export interface Paper {
