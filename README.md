@@ -121,38 +121,28 @@ There is no server. All data fetching happens at build time; every visitor recei
 
 ```mermaid
 sequenceDiagram
-    participant Dev  as Developer
-    participant GH   as GitHub repo
-    participant CI   as GitHub Actions
-    participant Ext  as External APIs
-    participant CDN  as GitHub Pages CDN
-    participant User as Visitor browser
+    participant Dev as Developer
+    participant CI  as GitHub Actions
+    participant API as External APIs
+    participant CDN as GitHub Pages
+    participant Usr as Visitor
 
-    rect rgb(20, 30, 50)
-        Note over Dev,CDN: Build time — once per push to main
+    Note over Dev,CDN: BUILD TIME — once per push to main
+    Dev->>CI: git push main
+    CI->>API: fetch Medium RSS
+    CI->>API: fetch Dev.to articles
+    CI->>API: fetch GitHub repos
+    API-->>CI: posts + projects data
+    CI->>CI: next build → out/
+    CI->>CDN: upload Pages artifact
+    CDN-->>Dev: live at yourusername.github.io
 
-        Dev->>GH: git push main
-        GH->>CI: trigger deploy.yml
-        par fetch content
-            CI->>Ext: Medium RSS feed
-            CI->>Ext: Dev.to articles API
-            CI->>Ext: GitHub repos API
-        end
-        Ext-->>CI: posts + projects + repo data
-        CI->>CI: next build — pre-render every page to out/
-        CI->>CDN: upload out/ as Pages artifact
-        CDN-->>Dev: live at yourusername.github.io
-    end
-
-    rect rgb(20, 40, 30)
-        Note over User,CDN: Request time — every visitor, no server involved
-
-        User->>CDN: GET /
-        CDN-->>User: 200 OK — index.html (~50ms TTFB)
-        User->>CDN: GET /blog/my-post
-        CDN-->>User: 200 OK — pre-built post HTML
-        Note over User: No API calls at runtime.<br/>No database. No cold starts.<br/>Just flat files on a CDN.
-    end
+    Note over CDN,Usr: REQUEST TIME — every visitor
+    Usr->>CDN: GET /
+    CDN-->>Usr: 200 OK — pre-built HTML
+    Usr->>CDN: GET /blog/my-post
+    CDN-->>Usr: 200 OK — pre-built HTML
+    Note over Usr: No server. No API calls at runtime.
 ```
 
 ### Blog aggregation
