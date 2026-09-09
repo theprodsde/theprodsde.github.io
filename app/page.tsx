@@ -1,14 +1,31 @@
 import Link from "next/link";
 import { getAllPosts } from "@/lib/posts";
 import { getProjects } from "@/lib/github";
+import { getOssPRs, getRecentCommits } from "@/lib/contributions";
 import BlogCard from "@/components/BlogCard";
 import ProjectCard from "@/components/ProjectCard";
 import SocialLinks from "@/components/SocialLinks";
 
 export const revalidate = false;
 
+function fmtDate(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days === 0) return "today";
+  if (days === 1) return "1d ago";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
 export default async function Home() {
-  const [allPosts, allProjects] = await Promise.all([getAllPosts(), getProjects()]);
+  const [allPosts, allProjects, ossPRs, recentCommits] = await Promise.all([
+    getAllPosts(),
+    getProjects(),
+    getOssPRs(),
+    getRecentCommits(),
+  ]);
 
   const latestPosts = allPosts.slice(0, 3);
   const featuredProjects = allProjects.filter((p) => p.featured).slice(0, 3);
@@ -82,6 +99,109 @@ export default async function Home() {
               <ProjectCard key={project.slug} project={project} />
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Open Source */}
+      {(ossPRs.length > 0 || recentCommits.length > 0) && (
+        <section className="container-page section-gap border-t border-border">
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <h2 className="font-display font-bold text-lg sm:text-xl text-text-primary">
+              Open Source
+            </h2>
+            <Link href="/oss" className="btn-ghost text-xs sm:text-sm">
+              All contributions
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </Link>
+          </div>
+
+          {/* Stats */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {[
+              { n: ossPRs.length, label: "PRs merged" },
+              {
+                n: new Set([...ossPRs.map((p) => p.repoName), ...recentCommits.map((c) => c.repoName)]).size,
+                label: "repos",
+              },
+              { n: recentCommits.length, label: "recent commits" },
+            ].map(({ n, label }) => (
+              <div key={label} className="flex items-baseline gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface">
+                <span className="font-display font-bold text-lg text-lime">{n}</span>
+                <span className="text-xs font-mono text-text-muted">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Top PRs */}
+          {ossPRs.length > 0 && (
+            <div className="flex flex-col gap-2 mb-6">
+              {ossPRs.slice(0, 4).map((pr) => {
+                const [owner, repo] = pr.repoName.split("/");
+                return (
+                  <Link
+                    key={pr.id}
+                    href={pr.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="card group flex items-center gap-3 py-3 px-4 no-underline"
+                  >
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-lime/10 border border-lime/20 font-mono text-xs text-lime shrink-0">
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z" />
+                      </svg>
+                      merged
+                    </span>
+                    <p className="flex-1 min-w-0 text-sm text-text-primary font-medium truncate group-hover:text-lime transition-colors">
+                      {pr.title}
+                    </p>
+                    <span className="shrink-0 font-mono text-xs text-text-muted">
+                      <span className="text-text-muted">{owner}/</span>
+                      <span className="text-text-primary">{repo}</span>
+                    </span>
+                    <span className="shrink-0 text-xs font-mono text-text-muted hidden sm:block">
+                      {fmtDate(pr.mergedAt)}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Commit log terminal */}
+          {recentCommits.length > 0 && (
+            <div className="rounded-xl border border-border bg-surface overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-ink/60">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
+                <span className="ml-2 font-mono text-xs text-text-muted">git log --oneline</span>
+              </div>
+              <div className="divide-y divide-border/40">
+                {recentCommits.slice(0, 6).map((c) => (
+                  <Link
+                    key={c.sha}
+                    href={c.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface/60 transition-colors group no-underline"
+                  >
+                    <span className="font-mono text-xs text-lime/70 shrink-0 w-14">{c.sha}</span>
+                    <span className="font-mono text-xs text-text-primary flex-1 min-w-0 truncate group-hover:text-lime transition-colors">
+                      {c.message}
+                    </span>
+                    <span className="font-mono text-xs text-text-muted shrink-0 hidden sm:block">
+                      {c.repoName.split("/")[1]}
+                    </span>
+                    <span className="font-mono text-xs text-text-muted shrink-0">
+                      {fmtDate(c.pushedAt)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 

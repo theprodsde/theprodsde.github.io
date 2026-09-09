@@ -46,3 +46,23 @@ export interface Paper {
   abstract: string;
   tags: string[];
 }
+
+export interface OssPR {
+  id: number;
+  title: string;
+  url: string;
+  repoName: string;
+  repoUrl: string;
+  createdAt: string;
+  mergedAt: string;
+  labels: string[];
+}
+
+export interface CommitActivity {
+  sha: string;
+  message: string;
+  url: string;
+  repoName: string;
+  repoUrl: string;
+  pushedAt: string;
+}

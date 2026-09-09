@@ -8,6 +8,7 @@ import { useState } from "react";
 const links = [
   { href: "/blog", label: "Writing" },
   { href: "/projects", label: "Projects" },
+  { href: "/oss", label: "OSS" },
 ];
 
 export default function Nav() {
