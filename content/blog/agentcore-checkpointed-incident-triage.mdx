@@ -1,0 +1,65 @@
+---
+title: "I Built an Incident-Triage Agent That Resumes From Checkpoints"
+date: "2026-09-20"
+tags: ["ai-agents", "sre", "incident-response", "postgres", "open-source"]
+excerpt: "Most LLM agents lose everything when they crash. AgentCore checkpoints every pipeline step to Postgres and writes resolved incidents into episodic memory — here's the architecture, and what it actually learns."
+---
+
+## The 3am problem isn't the fix — it's the first 20 minutes
+
+When an alert fires, the actual fix is usually fast. What's slow is the ritual before it: which service, which dashboard, which Kibana query, which runbook, did someone deploy recently, didn't this exact thing happen last month? For most recurring incident classes — DB deadlocks, OOM kills, latency regressions — that first investigation loop is repetitive enough that it follows the same shape every time.
+
+That shape is what I automated. [AgentCore](https://github.com/theprodsde/agentcore) is a self-hosted incident-triage orchestrator: an alert (Slack message, PagerDuty/Alertmanager webhook, or API call) kicks off a pipeline that recalls similar past incidents, plans tool calls with an LLM, queries your logs and metrics, and posts a structured analysis back — probable cause, affected systems, next actions, ticket link — in about 30 seconds.
+
+It doesn't remediate anything. It does the reading, so the on-call engineer starts at "validate and act" instead of "where do I even look".
+
+## Why checkpointing, not just retries
+
+The uncomfortable truth about LLM agents in ops: the pipeline touches an LLM API, a vector store, a log backend, a metrics backend, and a ticketing system — five external dependencies, any of which can be down *during an incident*, which is exactly when some of them are most likely to be down.
+
+The common answer is retries with backoff. But retrying a whole agent run is wasteful (you re-pay for LLM calls that already succeeded) and sometimes wrong (you re-create the ticket you already created). So AgentCore treats the pipeline like a workflow engine treats a job: every step persists its input and output to Postgres before the next step runs.
+
+```
+1. memory retrieval   → checkpoint (similar past incidents)
+2. LLM planner        → checkpoint (tool calls + reasoning)
+3. tool execution     → checkpoint (raw log/metric/runbook data)
+4. synthesizer        → checkpoint (final report)
+```
+
+If step 3 dies — network blip, pod eviction, Loki timeout — the task pauses with the exact error surfaced. Resume replays *from step 3*: steps 1 and 2 are loaded from their checkpoints, not re-run. The LLM plan you already paid for is reused verbatim. On process restart, a recovery pass re-enqueues anything that was mid-flight in the last 24 hours.
+
+This sounds obvious written down. Almost no agent framework does it, because in a demo nothing ever crashes.
+
+## What the memory actually learns
+
+Every completed investigation writes one record: the goal, the synthesized outcome, and an embedding of both, into pgvector. Step 1 of every new investigation does a cosine-similarity search over that store, re-ranked with a 180-day half-life time decay so stale resolutions fade.
+
+The interesting part is what this converges to. After the second DB-deadlock incident, the planner's context contains "last time: terminated idle connections, increased pool size, resolved in 12 min". That's not fine-tuning, not RAG over docs — it's the team's own incident history becoming the prior. A new on-call engineer effectively inherits the triage instincts of everyone who was on-call before them.
+
+Two design decisions here that I'd defend:
+
+**Memories are scored, not just stored.** A resolution that produced a real ticket, identified a concrete cause, and needed zero retries scores higher than a vague one that took three resumes. Retrieval weight = score × time decay. Garbage investigations decay out of influence.
+
+**Memories are tenant-isolated at the query level.** Team A's incidents never appear in team B's LLM prompts. This was actually the source of the nastiest bug I fixed pre-release — the retrieval query originally had no team filter, which is the kind of leak you only notice when you think adversarially about multi-tenancy.
+
+## The parts that made it survive contact with production
+
+A few things that weren't in the demo version but turned out to be non-negotiable:
+
+- **Verify webhook HMACs against raw bytes.** Signing `JSON.stringify(req.body)` fails the moment the sender's whitespace or key order differs from yours. Capture the raw body before the JSON parser touches it.
+- **Slack signature verification + event dedup.** Slack retries events on slow responses; without an event-ID cache you get three investigations per alert. Without signature checks, anyone who finds your URL spends your OpenAI budget.
+- **Hard timeouts per tool call.** A "time budget" that only prunes the plan by historical averages does nothing when Loki hangs. Every tool call gets a wall-clock cap.
+- **Never cache side-effectful tools.** A cached `create_ticket` result means no ticket was created. Caching is for reads.
+- **Dry-run enforced in code, not in the prompt.** The planner is told not to create tickets on dry runs. Prompts are suggestions; the executor filters side-effect tools regardless.
+
+Every external integration also has a deterministic simulation fallback, which had a side effect I didn't anticipate: the whole stack runs end-to-end with zero credentials — `docker compose up`, no API keys — which turned out to be the single best onboarding feature, and it makes the test suite honest.
+
+## And because it's 2026: it's also an MCP server
+
+AgentCore consumes tools via MCP (that's how the log/metric/ticket backends plug in), but it also *exposes itself* as an MCP server. Add it to Claude Code or Claude Desktop and "investigate the latency spike on payments-service" becomes a tool call that runs the full checkpointed pipeline — with your team's memory behind it — and returns the report into your conversation.
+
+## Honest limitations
+
+Single-process task queue (checkpoints make crashes survivable, but don't run two replicas yet — BullMQ dispatch is the planned fix). No rate limiting built in — put a proxy in front and cap your LLM spend. Embeddings are fixed at 1536 dims for now, so fully-local Ollama setups fall back to keyword-ranked memory. It investigates; it deliberately does not remediate.
+
+The code is Apache-2.0: [github.com/theprodsde/agentcore](https://github.com/theprodsde/agentcore). If you run ELK or Datadog instead of Loki/Prometheus, the tool layer is one file and there are `good first issue` specs waiting.

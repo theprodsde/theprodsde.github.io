@@ -1,0 +1,120 @@
+---
+title: "Your Agent's Memory Shouldn't Answer Questions It Wasn't Asked"
+date: "2026-09-21"
+tags: ["agents", "ai", "memory", "open-source", "mcp", "python"]
+excerpt: "Every agent-memory demo stores a question and retrieves it back. Here's the query that breaks most of them — and why I think memory needs a decision layer, not just a retriever."
+---
+
+Every agent-memory system demos the same way: store "How do I reset my
+password?", ask "How do I reset my password?", get the answer back. Magic.
+
+Here's the query that breaks most of them:
+
+> Stored memory: **"What payment methods do you support?"** → *"We accept
+> Visa, Mastercard, and PayPal."*
+>
+> User asks: **"Does your platform support two-factor authentication?"**
+
+A retrieve-and-inject pipeline finds the payment memory (it shares the word
+*support*), it's the top hit, and the answer about Visa and Mastercard goes
+into the prompt — or worse, straight back to the user. The memory system did
+exactly what it was built to do: retrieve. Nobody asked it whether the
+retrieval should be *used*.
+
+I know this failure mode intimately because an early version of my own
+scoring had it. The top hit was normalized to a perfect 1.0, so *any* shared
+word replayed a stored answer verbatim at confidence 1.0. A question about
+two-factor auth got the PayPal answer, confidently. I fixed it, wrote
+adversarial cases into the eval suite so it can't come back — and then
+realized the fix *is* the product.
+
+## Memory needs a decision layer, not just a retriever
+
+Retrieval answers "what did we store about this?". An agent needs a second
+question answered: **"should I use it, and how much should I trust it?"**
+
+That's what [Agent Memory](https://github.com/TheProdSDE/agent-memory-sdk)
+does. Every `resolve()` returns one of four explicit actions:
+
+| Action | Meaning | When |
+|---|---|---|
+| **replay** | Return the stored answer verbatim | Exact/near-exact repeat, high trust |
+| **restore** | Inject the memory as context, let the LLM adapt it | Paraphrase, adjacent question |
+| **verify** | Surface the memory but validate before reuse | Stale or flagged facts |
+| **none** | Ignore memory entirely | Weak or coincidental matches |
+
+The score behind the action combines similarity, recency, stored confidence,
+and usage — and crucially, the non-similarity factors can *lower* it. A
+memory stored with `confidence=0.1` never replays verbatim, even on an exact
+query match; it restores as context instead. A fact that keeps being
+replayed doesn't get artificially fresher; it ages into `verify`.
+
+And it shows its work:
+
+```text
+>>> print(memory.resolve("Does the platform support 2FA?").explain())
+action: none
+confidence: 0.68
+reasons:
+  - keyword match
+  - below restore threshold
+scores:
+  semantic_score: 0.60
+  recency_score: 1.00
+  confidence_score: 1.00
+  policy_score: 0.68
+```
+
+When your agent answers wrongly, you can see *why the memory layer decided
+what it decided* — which is more than most of us can say about our RAG
+pipelines.
+
+## The numbers (reproducible, no synthetic baselines)
+
+The eval suite includes the trap cases above. Current results, reproducible
+with `agent-memory eval` from the repo:
+
+- **25/25 decision-quality cases** on both backends — lexical SQLite
+  (FTS5 + BM25 + query-term coverage), and SQLite with
+  [sqlite-vec](https://github.com/asg017/sqlite-vec) embeddings
+- **~12ms** per `resolve()` at 5,000 memories — a local SQLite file, no
+  server, no API keys
+- The semantic extra is ONNX MiniLM via fastembed. No torch download.
+
+I deliberately don't publish a "99% faster than an LLM call" number computed
+against a hardcoded baseline — an earlier version of the benchmark did
+exactly that, and it was the least honest line in the repo. If you pass your
+own measured latency, the benchmark compares against that, labeled as
+user-supplied.
+
+## Try it in 60 seconds
+
+```python
+from agent_memory import Memory, MemoryAction
+
+memory = Memory(persist_dir=".agent_memory")
+memory.remember("What payment methods do you support?",
+                "We accept Visa, Mastercard, and PayPal.")
+
+decision = memory.resolve("Does the platform support two-factor auth?")
+assert decision.action == MemoryAction.NONE   # the whole point
+```
+
+Or as an MCP server for Cursor / Claude Code — one config block:
+
+```json
+{
+  "mcpServers": {
+    "agent-memory": {
+      "command": "agent-memory-mcp",
+      "env": { "AGENT_MEMORY_DIR": "~/.agent_memory" }
+    }
+  }
+}
+```
+
+The repo is [github.com/TheProdSDE/agent-memory-sdk](https://github.com/TheProdSDE/agent-memory-sdk)
+(`pip install agent-memory-sdk`). The adversarial eval dataset lives in
+`benchmarks/datasets/decision_traps.json` — and I take PRs that add trap
+cases the system fails. Breaking it is the most useful contribution you can
+make.

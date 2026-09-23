@@ -1,0 +1,174 @@
+---
+title: "Our Benchmark Reported 0.96 Recall. It Was Measuring Nothing."
+date: "2026-09-22"
+tags: ["benchmarking", "ai", "memory", "agents", "testing", "open-source"]
+excerpt: "An overnight benchmark run produced a 0.9653 and a 0.0000 for the same dataset. Both numbers were wrong, for different reasons. A postmortem on four measurement bugs — and why every one of them reported success."
+---
+
+Last weekend my benchmark harness ran seven datasets overnight on a GPU
+machine and produced two numbers for the same dataset, in the same run:
+
+- Recall@10 = **0.9653** (hybrid weight sweep)
+- Recall@10 = **0.0000** (every other phase — every strategy, every model)
+
+Both were wrong. Not noisy, not misconfigured — *structurally* wrong, in four
+different ways, and every single one of those ways printed `✓ success`.
+
+I build MemTuner, a harness for tuning and evaluating agent-memory
+retrieval: BM25 vs embeddings vs hybrid, decay policies, rerankers, across
+datasets like LoCoMo and LongMemEval. The whole point of the project is
+careful measurement. This is the story of the weekend it wasn't, what each
+bug looked like from the outside, and the checks that now make each one
+impossible. If you maintain any eval harness, I suspect at least two of these
+live in yours right now.
+
+---
+
+## Bug 1: The holdout window slid off the edge of the data
+
+The harness replays each dataset as a simulated timeline: memories are
+written on day N, queries execute on later days. To keep tuning honest, it
+holds out the **last 20% of days** — events there are never indexed, and only
+queries there are scored.
+
+The split day was computed from the *evaluation horizon*:
+
+```python
+split_day = int(total_days * (1 - test_frac))
+```
+
+Sensible — until a run sets `--evaluation-horizon 50` on a dataset whose
+timeline is 30 days long. The harness (reasonably) extends the horizon to
+cover the configured value. The split lands on day 40. The scoring window is
+days 40–49.
+
+The dataset's last query is on day 29.
+
+**Zero queries scored.** Recall 0.0, MRR 0.0, latency 0.0ms — recorded as a
+successful cell. 196 cells across four datasets, all green checkmarks, all
+measuring the empty set.
+
+The tell, in hindsight, was embarrassing: *recall, MRR, and latency were all
+exactly zero.* A retrieval system that genuinely fails still takes
+milliseconds to fail. A zero in the latency column doesn't mean "fast" — it
+means "never ran."
+
+**The fix** is two-part, and the second part matters more than the first.
+The split is now computed from the days that actually contain data, so a
+padded horizon can't move it. And — the real fix — a cell that scores zero
+queries is now recorded as a **failed cell with an explanatory error**, not a
+zero. A benchmark that cannot fail loudly will lie confidently.
+
+## Bug 2: Datasets where the holdout can never contain the answer
+
+Fixing bug 1 revealed bug 2, which is nastier because no code is wrong.
+
+Several of my datasets are converted QA corpora — SQuAD, CoQA, PersonaChat.
+The converters spread passages across a 30-day timeline and put each question
+on a day. Specifically: **the same day as its source passage.**
+
+Now walk through the temporal holdout: events on held-out days are never
+indexed; queries on held-out days are scored. If every query's gold memory
+lives on the query's own day, then every scored query asks about a memory
+that was deliberately never written. I checked: for SQuAD, all 2,288
+holdout-window queries reference only held-out memories. CoQA: 1,487 of
+1,487. PersonaChat: 701 of 701.
+
+Recall on these datasets is **structurally zero**. Not "the retrieval is
+bad" — *the correct answer is not in the index, by protocol design*. No
+amount of tuning, and no retrieval system on earth, can score above 0.0.
+
+The lesson took me a while to phrase: **dataset structure is part of your
+harness.** A temporal holdout assumes queries reference the past. Converted
+QA corpora violate that silently, and nothing in the schema says so. My
+`doctor` command now simulates the split against every gold file and warns
+when the holdout window is empty or unanswerable — dataset fitness is
+checked, never assumed.
+
+(These datasets aren't garbage, to be clear. They're fine static-retrieval
+smoke tests. They just cannot say anything about *memory* — decay, recency,
+time — which is the thing I'm building.)
+
+## Bug 3: The 0.96 that was measuring string overlap
+
+So where did the *good* number come from?
+
+The hybrid-weight sweep runs hundreds of near-identical cells, so it has a
+fast path: load the gold file, index everything, score everything. Read that
+again: index **everything**, score **everything**. No day replay. No holdout.
+The one code path that produced a beautiful number was the one that skipped
+the evaluation protocol.
+
+And even that 0.9653 wasn't saying what it seemed to. The harness's own
+leakage check had flagged that **83% of SQuAD queries verbatim-overlap the
+corpus text**. On data like that, retrieval is a solved problem: plain BM25 —
+no embeddings, no memory system, no tuning — scored 0.944 in the same sweep.
+My entire stack was adding 0.02 over grep.
+
+That's the pattern worth internalizing: the too-bad numbers and the too-good
+number were *both* measurement artifacts. The only numbers from that run that
+survived scrutiny were the unremarkable ones — 0.35 here, 0.25 there.
+**Suspicion should scale with surprise, in both directions.**
+
+## Bug 4: The reranker comparison that compared nothing
+
+One more, found while auditing everything else. The report claimed
+cross-encoder rerankers made retrieval *worse* — negative lift, consistently.
+Alarming if true (rerankers help almost everywhere in the literature), so it
+should have been investigated the day it first appeared. It wasn't, because
+it appeared alongside hundreds of other numbers.
+
+Two bugs stacked:
+
+1. The "no reranker" baseline was the macro-average of **every cell in the
+   study** — recency baselines, decay sweeps, weight sweeps — while each
+   reranker row was one cell. Lift = one pipeline vs. the average of a zoo.
+2. Even within the reranker phase, the control cell used *semantic* retrieval
+   for stage 1 while the reranker cells used *BM25*. Control and treatment
+   differed in more than the treatment variable — undergraduate experimental
+   design, failed silently at scale.
+
+With a like-for-like comparison (same BM25 stage 1, reranker as the only
+variable), one reranker is neutral and one shows a small real drop that's now
+a tracked open question instead of a headline. The aggregation now restricts
+lift to phase-matched cells, and there's a regression test that reproduces
+the exact wrong-sign scenario.
+
+## What actually changed
+
+Every fix follows the same principle: **make the failure loud at the layer
+where it happens.**
+
+| Failure | Before | After |
+|---------|--------|-------|
+| Empty scoring window | recall=0.0, `✓ success` | cell fails with explicit error |
+| Unanswerable holdout | recall=0.0, `✓ success` | loader warns; `doctor` flags the dataset |
+| Full-pool sweep cells | mixed into rankings | plot-only, excluded from rankings |
+| Cross-phase lift baseline | silent wrong-sign lift | phase-matched, scope labeled in output |
+
+Plus regression tests for each, and the contaminated results quarantined with
+a README explaining why every number in that directory is uncitable.
+
+## Why I'm publishing this
+
+The agent-memory space has a measurement-trust problem. Vendors benchmark
+their own systems, report their own numbers, and publicly dispute each
+other's methodology — with some justification, apparently, because here's an
+independent harness built *specifically for careful measurement* shipping
+four silent measurement bugs in one run.
+
+I'm working toward publishing neutral, reproducible comparisons of memory
+systems on shared datasets. The only credential that matters for that job is
+demonstrated paranoia about your own numbers. So this post is the
+credential: here's how my harness lied to me, here's how I caught it, here's
+the machinery that makes each lie impossible now.
+
+Three questions to ask your own eval pipeline tonight:
+
+1. **Can a cell that evaluates nothing report success?** (Mine could.)
+2. **Does any fast path skip the protocol the slow path enforces?** (Mine did.)
+3. **When a number is surprisingly good or surprisingly bad, is your first
+   move to investigate the number — or to report it?**
+
+The run that produced all of this was, accidentally, the most useful
+benchmark run I've ever done. It just wasn't benchmarking what I thought.
