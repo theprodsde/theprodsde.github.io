@@ -3,6 +3,7 @@ import { Inter, Syne, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import { AUTHOR_NAME, AUTHOR_URL, DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -25,28 +26,44 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://theprodsde.github.io"),
+  metadataBase: new URL(`${SITE_URL}/`),
   title: {
-    default: "TheProdSDE",
+    default: "TheProdSDE | Production Software Engineering",
     template: "%s · TheProdSDE",
   },
   description:
-    "The Production Side of Software Engineering — the standards, trade-offs, decisions, and systems engineers learn only on the job. By Karan Gehlod.",
-  authors: [{ name: "Karan Gehlod", url: "https://karangehlod.github.io" }],
-  creator: "TheProdSDE",
+    "The Production Side of Software Engineering — practical writing, open-source projects, and lessons from building software that works in production.",
+  authors: [{ name: AUTHOR_NAME, url: AUTHOR_URL }],
+  creator: AUTHOR_NAME,
+  publisher: SITE_NAME,
+  alternates: { canonical: SITE_URL },
+  icons: { icon: "/favicon.ico" },
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://theprodsde.github.io",
-    siteName: "TheProdSDE",
-    title: "TheProdSDE",
-    description: "The Production Side of Software Engineering.",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: "TheProdSDE | Production Software Engineering",
+    description:
+      "Practical writing, open-source projects, and lessons from building software that works in production.",
+    images: [{ url: DEFAULT_OG_IMAGE, alt: `${SITE_NAME} logo` }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "TheProdSDE",
+    title: "TheProdSDE | Production Software Engineering",
+    description:
+      "Practical writing, open-source projects, and lessons from building software that works in production.",
+    images: [DEFAULT_OG_IMAGE],
     creator: "@theprodsde",
   },
+  verification: process.env.NEXT_PUBLIC_GSC_VERIFICATION
+    ? { google: process.env.NEXT_PUBLIC_GSC_VERIFICATION }
+    : undefined,
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -61,6 +78,28 @@ export default function RootLayout({
       className={`${inter.variable} ${syne.variable} ${jetbrains.variable}`}
     >
       <body className="bg-ink text-text-primary min-h-screen flex flex-col">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify([
+              {
+                "@context": "https://schema.org",
+                "@type": "Person",
+                name: AUTHOR_NAME,
+                url: AUTHOR_URL,
+                sameAs: [AUTHOR_URL, "https://github.com/TheProdSDE"],
+              },
+              {
+                "@context": "https://schema.org",
+                "@type": "WebSite",
+                name: SITE_NAME,
+                url: SITE_URL,
+                description: metadata.description,
+                publisher: { "@type": "Person", name: AUTHOR_NAME, url: AUTHOR_URL },
+              },
+            ]).replace(/</g, "\\u003c"),
+          }}
+        />
         <Nav />
         <main className="flex-1">{children}</main>
         <Footer />

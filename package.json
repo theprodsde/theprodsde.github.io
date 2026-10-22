@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && touch out/.nojekyll",
+    "seo:check": "node scripts/seo-check.mjs",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run"

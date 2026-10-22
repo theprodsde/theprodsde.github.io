@@ -32,6 +32,12 @@ jobs:
         run: npm run build
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
+          NEXT_PUBLIC_SITE_URL: https://theprodsde.github.io
+
+      - name: SEO checks
+        run: npm run seo:check
+        env:
+          NEXT_PUBLIC_SITE_URL: https://theprodsde.github.io
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

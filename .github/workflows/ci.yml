@@ -27,3 +27,9 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      - name: Production build
+        run: npm run build
+
+      - name: SEO checks
+        run: npm run seo:check

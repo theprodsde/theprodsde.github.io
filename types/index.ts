@@ -10,6 +10,7 @@ export interface BlogPost {
   url: string;
   thumbnail?: string;
   readingTime?: number;
+  modified?: string;
   content?: string;
 }
 

@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getOssPRs, getRecentCommits } from "@/lib/contributions";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Open Source",
+export const metadata: Metadata = pageMetadata({
+  title: "Open Source Contributions",
   description:
-    "Merged pull requests to external projects and recent commit activity by TheProdSDE.",
-};
+    "Merged pull requests and recent public commit activity from Karan Gehlod's open-source work.",
+  pathname: "/oss",
+});
 
 export const revalidate = false;
 

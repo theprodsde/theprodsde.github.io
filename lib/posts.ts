@@ -22,15 +22,19 @@ export function getDirectPosts(): BlogPost[] {
         slug,
         title: data.title ?? slug,
         excerpt: data.excerpt ?? truncate(content, 200),
-        date: data.date ?? new Date().toISOString(),
-        tags: data.tags ?? [],
+        date: typeof data.date === "string" ? data.date : "",
+        tags: Array.isArray(data.tags) ? data.tags : [],
         source: "direct" as const,
         url: `/blog/${slug}`,
         thumbnail: data.thumbnail,
         readingTime: estimateReadingTime(content),
+        modified: data.modified ?? data.updated,
         content,
+        draft: data.draft === true,
+        private: data.private === true,
       };
     })
+    .filter((post) => Boolean(post.date) && !post.draft && !post.private)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 

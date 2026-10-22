@@ -304,6 +304,35 @@ Push to `main` — the [deploy workflow](.github/workflows/deploy.yml) takes it 
 
 ---
 
+## SEO configuration
+
+The site is a static Next.js export deployed to GitHub Pages at `https://theprodsde.github.io`. SEO URLs default to that verified production URL and can be overridden for a deliberate alternate deployment with `NEXT_PUBLIC_SITE_URL`.
+
+Optional environment variables:
+
+- `NEXT_PUBLIC_SITE_URL`: canonical site origin, including `https://`, without a trailing slash.
+- `NEXT_PUBLIC_GSC_VERIFICATION`: Google Search Console HTML meta verification value. Leave unset unless ownership has been verified.
+- `GH_PAT`: optional read-only GitHub token used only during builds to improve API rate limits; never expose it to the client.
+
+The build generates canonical metadata, Open Graph/Twitter tags, Person/WebSite and article/project JSON-LD, `sitemap.xml`, `robots.txt`, and an RSS feed at `/feed.xml`. Run the production checks with:
+
+```bash
+npm ci
+NEXT_PUBLIC_SITE_URL=https://theprodsde.github.io npm run build
+NEXT_PUBLIC_SITE_URL=https://theprodsde.github.io npm run seo:check
+```
+
+### Search Console setup
+
+1. Open Google Search Console and add the `https://theprodsde.github.io` URL-prefix property.
+2. Verify ownership using the HTML meta-tag value supplied by Search Console as `NEXT_PUBLIC_GSC_VERIFICATION`, then rebuild and deploy. A DNS or HTML-file verification method can be used instead if preferred.
+3. Submit `https://theprodsde.github.io/sitemap.xml` manually.
+4. Use URL Inspection after deployment to request indexing for important pages and review indexing, Core Web Vitals, and Search performance reports.
+
+Ownership verification and sitemap submission are manual one-time steps unless an authenticated Search Console integration is deliberately configured. No traffic or Search Console data is accessed by this repository.
+
+---
+
 ## Design system
 
 The site uses a single-accent dark theme:

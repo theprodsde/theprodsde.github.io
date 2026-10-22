@@ -5,12 +5,13 @@ import { mdToHtml } from "@/lib/text";
 import matter from "gray-matter";
 import fs from "fs";
 import path from "path";
+import Link from "next/link";
+import { absoluteUrl, jsonLd, pageMetadata, SITE_NAME } from "@/lib/seo";
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateStaticParams() {
-  const posts = await getAllPosts();
-  return posts.map((p) => ({ slug: p.slug }));
+  return getDirectPosts().map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -18,10 +19,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const directPosts = getDirectPosts();
   const post = directPosts.find((p) => p.slug === slug);
   if (!post) return {};
-  return {
+  const canonical = `/blog/${post.slug}`;
+  return pageMetadata({
     title: post.title,
     description: post.excerpt,
-  };
+    pathname: canonical,
+    type: "article",
+    image: post.thumbnail,
+    publishedTime: post.date,
+    modifiedTime: post.modified,
+  });
 }
 
 export default async function BlogPostPage({ params }: Props) {
@@ -58,6 +65,39 @@ export default async function BlogPostPage({ params }: Props) {
   if (!raw) notFound();
 
   const { content } = matter(raw);
+  const relatedPosts = getDirectPosts()
+    .filter((candidate) => candidate.slug !== post.slug)
+    .map((candidate) => ({
+      post: candidate,
+      score: candidate.tags.filter((tag) => post.tags.includes(tag)).length,
+    }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(({ post: candidate }) => candidate);
+  const canonicalUrl = absoluteUrl(`/blog/${post.slug}`);
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.excerpt,
+    author: { "@type": "Person", name: "Karan Gehlod", url: "https://karangehlod.github.io" },
+    datePublished: post.date,
+    ...(post.modified ? { dateModified: post.modified } : {}),
+    ...(post.thumbnail ? { image: absoluteUrl(post.thumbnail) } : {}),
+    mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
+    url: canonicalUrl,
+    publisher: { "@type": "Organization", name: SITE_NAME, url: absoluteUrl("/") },
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+      { "@type": "ListItem", position: 2, name: "Writing", item: absoluteUrl("/blog") },
+      { "@type": "ListItem", position: 3, name: post.title, item: canonicalUrl },
+    ],
+  };
 
   function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString("en-US", {
@@ -69,6 +109,12 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <div className="container-prose py-12 sm:py-16">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd([articleJsonLd, breadcrumbJsonLd]) }} />
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-text-muted mb-8">
+        <Link href="/">Home</Link><span aria-hidden="true">/</span>
+        <Link href="/blog">Writing</Link><span aria-hidden="true">/</span>
+        <span className="text-text-primary" aria-current="page">{post.title}</span>
+      </nav>
       <div className="mb-10">
         <div className="flex items-center gap-2 text-xs text-text-muted mb-4 font-mono">
           <span className="source-badge-direct">Direct</span>
@@ -104,6 +150,21 @@ export default async function BlogPostPage({ params }: Props) {
         {/* MDX content rendered as plain HTML — for full MDX, use next-mdx-remote or similar */}
         <div dangerouslySetInnerHTML={{ __html: mdToHtml(content) }} />
       </article>
+
+      {relatedPosts.length > 0 && (
+        <aside className="mt-12 border-t border-border pt-8" aria-labelledby="related-heading">
+          <h2 id="related-heading" className="font-display font-bold text-xl text-text-primary mb-4">Related writing</h2>
+          <ul className="space-y-3">
+            {relatedPosts.map((related) => (
+              <li key={related.slug}>
+                <Link href={`/blog/${related.slug}`} className="text-lime hover:underline">
+                  {related.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )}
     </div>
   );
 }

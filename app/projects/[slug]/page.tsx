@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getProjects, getRepoReadme } from "@/lib/github";
 import { mdToHtml } from "@/lib/text";
+import { absoluteUrl, jsonLd, pageMetadata } from "@/lib/seo";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -16,10 +17,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const projects = await getProjects();
   const project = projects.find((p) => p.slug === slug);
   if (!project) return {};
-  return {
-    title: project.name,
+  return pageMetadata({
+    title: `${project.name} | Open-Source Project`,
     description: project.idea,
-  };
+    pathname: `/projects/${project.slug}`,
+  });
 }
 
 function formatDate(iso: string) {
@@ -37,9 +39,30 @@ export default async function ProjectDetailPage({ params }: Props) {
   if (!project) notFound();
 
   const readme = await getRepoReadme(project.name);
+  const canonicalUrl = absoluteUrl(`/projects/${project.slug}`);
+  const projectJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    name: project.name,
+    description: project.idea,
+    codeRepository: project.githubUrl,
+    url: canonicalUrl,
+    ...(project.language ? { programmingLanguage: project.language } : {}),
+    dateModified: project.updatedAt,
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+      { "@type": "ListItem", position: 2, name: "Projects", item: absoluteUrl("/projects") },
+      { "@type": "ListItem", position: 3, name: project.name, item: canonicalUrl },
+    ],
+  };
 
   return (
     <div className="container-prose py-12 sm:py-16">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd([projectJsonLd, breadcrumbJsonLd]) }} />
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-text-muted mb-10">
         <Link href="/" className="hover:text-lime transition-colors">

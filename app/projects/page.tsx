@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { getProjects } from "@/lib/github";
 import ProjectCard from "@/components/ProjectCard";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Projects",
-  description: "Open-source tools, experiments, and personal projects by TheProdSDE.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Projects | Open-Source Software",
+  description:
+    "Open-source tools, experiments, and software projects built and maintained by Karan Gehlod.",
+  pathname: "/projects",
+});
 
 export const revalidate = false;
 

@@ -5,6 +5,13 @@ import { getOssPRs, getRecentCommits } from "@/lib/contributions";
 import BlogCard from "@/components/BlogCard";
 import ProjectCard from "@/components/ProjectCard";
 import SocialLinks from "@/components/SocialLinks";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "TheProdSDE | Production Software Engineering",
+  description:
+    "Practical production engineering writing, open-source projects, and systems lessons by Karan Gehlod.",
+});
 
 export const revalidate = false;
 

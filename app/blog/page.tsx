@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { getAllPosts } from "@/lib/posts";
 import BlogFilter from "@/components/BlogFilter";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Writing",
-  description: "Production engineering writing — trade-offs, standards, decisions, and systems that engineers usually learn only on the job.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Writing | Production Engineering Articles",
+  description:
+    "Technical articles about production engineering, AI agents, benchmarking, reliability, and the decisions that shape software in practice.",
+  pathname: "/blog",
+});
 
 export const revalidate = false;
 
